@@ -7,6 +7,22 @@
 </p>
 <br />
 
+## Fork versioning (joomcode)
+
+This is Joom's fork of `transcend-io/terragrunt-atlantis-config`. Fork releases are numbered
+**`<upstream-version>-joom.<N>`**, where `<upstream-version>` is the upstream release this fork is
+based on and `<N>` is the fork revision (starts at `1`) on top of that base.
+
+- Fork-only change on the same upstream base → bump `N` (`1.21.1-joom.1` → `1.21.1-joom.2`).
+- Rebase onto a newer upstream release → reset `N` to `1` (`1.21.2-joom.1`).
+
+To cut a release:
+
+1. Set the new version in `main.go`, `Makefile` (`VERSION=`), and the two references in this README.
+2. Commit, then create and push the matching tag: `git tag -a vX.Y.Z-joom.N -m "..." && git push origin master vX.Y.Z-joom.N`.
+3. The tag push triggers `.github/workflows/release.yml` (builds all binaries + GitHub release) and
+   `container-build.yml` (Docker image tagged `vX.Y.Z-joom.N`).
+
 ## What is this?
 
 [Atlantis](https://runatlantis.io) is an awesome tool for Terraform pull request automation. Each repo can have a YAML config file that defines Terraform module dependencies, so that PRs that affect dependent modules will automatically generate `terraform plan`s for those modules.
@@ -48,7 +64,7 @@ Then, make sure `terragrunt-atlantis-config` is present on your Atlantis server.
 
 ```hcl
 variable "terragrunt_atlantis_config_version" {
-  default = "1.21.1"
+  default = "1.21.1-joom.1"
 }
 
 build {
@@ -192,7 +208,7 @@ You can install this tool locally to checkout what kinds of config it will gener
 Recommended: Install any version via go install:
 
 ```bash
-go install github.com/transcend-io/terragrunt-atlantis-config@v1.21.1
+go install github.com/joomcode/terragrunt-atlantis-config@v1.21.1-joom.1
 ```
 
 This module officially supports golang version v1.23, tested on Github with each build. 
