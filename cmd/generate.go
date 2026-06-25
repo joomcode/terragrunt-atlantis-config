@@ -730,6 +730,13 @@ func main(cmd *cobra.Command, args []string) error {
 			workingDirs = append(workingDirs, gitRoot)
 		}
 	}
+	// Seed the context with terragrunt's shared parsing caches (HCL file cache,
+	// run-cmd cache, etc). Without this, terragrunt's config.ContextCache creates a
+	// throwaway cache on every parse call, so the same parent configs (e.g. the root
+	// terragrunt.hcl included by every child) get re-tokenized hundreds of times.
+	// Captured before the local `config` variable shadows the config package.
+	ctx := config.WithConfigValues(context.Background())
+
 	// Read in the old config, if it already exists
 	oldConfig, err := readOldConfig()
 	if err != nil {
@@ -749,7 +756,6 @@ func main(cmd *cobra.Command, args []string) error {
 	}
 
 	lock := sync.Mutex{}
-	ctx := context.Background()
 	errGroup, _ := errgroup.WithContext(ctx)
 	sem := semaphore.NewWeighted(numExecutors)
 
