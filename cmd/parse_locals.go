@@ -104,7 +104,7 @@ func parseLocals(ctx *config.ParsingContext, path string, includeFromChild *conf
 	}
 
 	// Decode just the Base blocks. See the function docs for DecodeBaseBlocks for more info on what base blocks are.
-	baseBlocks, err := config.DecodeBaseBlocks(ctx, file, includeFromChild)
+	baseBlocks, err := config.DecodeBaseBlocks(ctx, tgLogger, file, includeFromChild)
 	if err != nil {
 		return ResolvedLocals{}, err
 	}

@@ -11,6 +11,8 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/gruntwork-io/terragrunt/config"
 	"github.com/gruntwork-io/terragrunt/options"
+	tglog "github.com/gruntwork-io/terragrunt/pkg/log"
+	"github.com/gruntwork-io/terragrunt/pkg/log/format"
 	"github.com/spf13/cobra"
 
 	"golang.org/x/sync/errgroup"
@@ -23,6 +25,13 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+)
+
+// tgLogger is the terragrunt logger passed into the config-parsing calls. In
+// terragrunt >=0.93 the logger is decoupled from TerragruntOptions and threaded
+// as an explicit arg, so we keep a single default-level instance here.
+var tgLogger = tglog.New(
+	tglog.WithFormatter(format.NewFormatter(format.NewPrettyFormatPlaceholders())),
 )
 
 // Parse env vars into a map
@@ -151,13 +160,13 @@ func getDependencies(ctx *config.ParsingContext, path string) ([]string, error) 
 		}
 
 		// Parse the HCL file
-		parseCtx := config.NewParsingContext(ctx, ctx.TerragruntOptions).
+		parseCtx := config.NewParsingContext(ctx, tgLogger, ctx.TerragruntOptions).
 			WithDecodeList(
 				config.DependencyBlock,
 				config.DependenciesBlock,
 				config.TerraformBlock,
 			)
-		parsedConfig, err := config.PartialParseConfigFile(parseCtx, path, nil)
+		parsedConfig, err := config.PartialParseConfigFile(parseCtx, tgLogger, path, nil)
 		if err != nil {
 			getDependenciesCache.set(path, getDependenciesOutput{nil, err})
 			return nil, err
@@ -262,7 +271,7 @@ func getDependencies(ctx *config.ParsingContext, path string) ([]string, error) 
 			terrOpts, _ := options.NewTerragruntOptionsWithConfigPath(depPath)
 			terrOpts.OriginalTerragruntConfigPath = ctx.TerragruntOptions.OriginalTerragruntConfigPath
 			terrOpts.Env = ctx.TerragruntOptions.Env
-			terrContext := config.NewParsingContext(ctx, terrOpts)
+			terrContext := config.NewParsingContext(ctx, tgLogger, terrOpts)
 			childDeps, err := getDependencies(terrContext, depPath)
 			if err != nil {
 				continue
@@ -328,7 +337,7 @@ func createProject(ctx context.Context, sourcePath string) (*AtlantisProject, er
 	options.OriginalTerragruntConfigPath = sourcePath
 	options.Env = getEnvs()
 
-	parsingContext := config.NewParsingContext(ctx, options)
+	parsingContext := config.NewParsingContext(ctx, tgLogger, options)
 	dependencies, err := getDependencies(parsingContext, sourcePath)
 	if err != nil {
 		return nil, err
@@ -446,7 +455,7 @@ func createHclProject(ctx context.Context, sourcePaths []string, workingDir stri
 	}
 	projectHclOptions.Env = getEnvs()
 
-	parsingContext := config.NewParsingContext(ctx, projectHclOptions)
+	parsingContext := config.NewParsingContext(ctx, tgLogger, projectHclOptions)
 	locals, err := parseLocals(parsingContext, projectHclFile, nil)
 	if err != nil {
 		return nil, err
@@ -502,7 +511,7 @@ func createHclProject(ctx context.Context, sourcePaths []string, workingDir stri
 			return nil, err
 		}
 		opt.Env = getEnvs()
-		parsingContext := config.NewParsingContext(ctx, opt)
+		parsingContext := config.NewParsingContext(ctx, tgLogger, opt)
 		dependencies, err := getDependencies(parsingContext, sourcePath)
 		if err != nil {
 			return nil, err

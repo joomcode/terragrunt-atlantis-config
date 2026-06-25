@@ -4,6 +4,7 @@ import (
 	"github.com/gruntwork-io/go-commons/errors"
 	"github.com/gruntwork-io/terragrunt/config"
 	"github.com/gruntwork-io/terragrunt/config/hclparse"
+	"github.com/gruntwork-io/terragrunt/pkg/log"
 	"github.com/gruntwork-io/terragrunt/util"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -50,7 +51,7 @@ func updateBareIncludeBlock(file *hcl.File, filename string) ([]byte, bool, erro
 }
 
 //go:linkname createTerragruntEvalContext github.com/gruntwork-io/terragrunt/config.createTerragruntEvalContext
-func createTerragruntEvalContext(ctx *config.ParsingContext, configPath string) (*hcl.EvalContext, error)
+func createTerragruntEvalContext(ctx *config.ParsingContext, l log.Logger, configPath string) (*hcl.EvalContext, error)
 
 // decodeHcl uses the HCL2 parser to decode the parsed HCL into the struct specified by out.
 //
@@ -91,7 +92,7 @@ func decodeHcl(
 		}
 	}
 
-	evalContext, err := createTerragruntEvalContext(ctx, filename)
+	evalContext, err := createTerragruntEvalContext(ctx, tgLogger, filename)
 	if err != nil {
 		return err
 	}
