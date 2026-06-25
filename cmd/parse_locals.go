@@ -12,6 +12,9 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 	"path/filepath"
+	"sync"
+
+	"golang.org/x/sync/singleflight"
 )
 
 // ResolvedLocals are the parsed result of local values this module cares about
@@ -96,8 +99,43 @@ func mergeResolvedLocals(parent ResolvedLocals, child ResolvedLocals) ResolvedLo
 	return parent
 }
 
+// Caches the result of parseLocals for top-level (includeFromChild == nil) calls.
+// createProject calls parseLocals once directly and once indirectly via getDependencies
+// for the same path with includeFromChild == nil; the result is deterministic for a
+// given path, so we memoize it to avoid parsing the file (and recursing into its
+// parents) twice. Parent recursion (includeFromChild != nil) is NOT cached because
+// parent locals can depend on the child path (e.g. find_in_parent_folders,
+// path_relative_to_include), so they differ per child.
+type resolvedLocalsOutput struct {
+	locals ResolvedLocals
+	err    error
+}
+
+var parseLocalsCache sync.Map // path string -> resolvedLocalsOutput
+var parseLocalsGroup singleflight.Group
+
 // Parses a given file, returning a map of all it's `local` values
 func parseLocals(ctx *config.ParsingContext, path string, includeFromChild *config.IncludeConfig) (ResolvedLocals, error) {
+	if includeFromChild != nil {
+		return parseLocalsUncached(ctx, path, includeFromChild)
+	}
+
+	if v, ok := parseLocalsCache.Load(path); ok {
+		out := v.(resolvedLocalsOutput)
+		return out.locals, out.err
+	}
+
+	res, _, _ := parseLocalsGroup.Do(path, func() (interface{}, error) {
+		locals, err := parseLocalsUncached(ctx, path, nil)
+		out := resolvedLocalsOutput{locals: locals, err: err}
+		parseLocalsCache.Store(path, out)
+		return out, nil
+	})
+	out := res.(resolvedLocalsOutput)
+	return out.locals, out.err
+}
+
+func parseLocalsUncached(ctx *config.ParsingContext, path string, includeFromChild *config.IncludeConfig) (ResolvedLocals, error) {
 	file, err := hclparse.NewParser(ctx.ParserOptions...).ParseFromFile(path)
 	if err != nil {
 		return ResolvedLocals{}, err
