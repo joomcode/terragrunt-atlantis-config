@@ -58,6 +58,14 @@ func newParsingContext(goCtx context.Context, configPath string, env map[string]
 	pctx.TofuImplementation = opts.TofuImplementation
 	pctx.Writers = opts.Writers
 
+	// Reuse terragrunt's partial-parse result cache (seeded on the shared context
+	// via config.WithConfigValues). Without this flag every PartialParseConfigFile
+	// re-parses from scratch, so the dependency-block cycle-detection DFS re-walks
+	// the same shared dependency configs (e.g. subnets, *-shared) once per project.
+	// The cache is keyed by config path + file content + include + decode list, so
+	// the generated output is unchanged.
+	pctx.UsePartialParseConfigCache = true
+
 	return pctx, nil
 }
 
