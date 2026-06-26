@@ -1,4 +1,4 @@
-VERSION=1.21.1-joom.2
+VERSION=1.21.1-joom.3
 PATH_BUILD=build/
 FILE_COMMAND=terragrunt-atlantis-config
 FILE_ARCH=$(shell go env GOOS)_$(shell go env GOARCH)
