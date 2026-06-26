@@ -5,10 +5,11 @@ package cmd
 // parses the `locals` blocks and evaluates their contents.
 
 import (
+	"context"
 	"fmt"
 	"github.com/gruntwork-io/go-commons/errors"
-	"github.com/gruntwork-io/terragrunt/config"
-	"github.com/gruntwork-io/terragrunt/config/hclparse"
+	"github.com/gruntwork-io/terragrunt/pkg/config"
+	"github.com/gruntwork-io/terragrunt/pkg/config/hclparse"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 	"path/filepath"
@@ -115,9 +116,9 @@ var parseLocalsCache sync.Map // path string -> resolvedLocalsOutput
 var parseLocalsGroup singleflight.Group
 
 // Parses a given file, returning a map of all it's `local` values
-func parseLocals(ctx *config.ParsingContext, path string, includeFromChild *config.IncludeConfig) (ResolvedLocals, error) {
+func parseLocals(goCtx context.Context, ctx *config.ParsingContext, path string, includeFromChild *config.IncludeConfig) (ResolvedLocals, error) {
 	if includeFromChild != nil {
-		return parseLocalsUncached(ctx, path, includeFromChild)
+		return parseLocalsUncached(goCtx, ctx, path, includeFromChild)
 	}
 
 	if v, ok := parseLocalsCache.Load(path); ok {
@@ -126,7 +127,7 @@ func parseLocals(ctx *config.ParsingContext, path string, includeFromChild *conf
 	}
 
 	res, _, _ := parseLocalsGroup.Do(path, func() (interface{}, error) {
-		locals, err := parseLocalsUncached(ctx, path, nil)
+		locals, err := parseLocalsUncached(goCtx, ctx, path, nil)
 		out := resolvedLocalsOutput{locals: locals, err: err}
 		parseLocalsCache.Store(path, out)
 		return out, nil
@@ -135,14 +136,14 @@ func parseLocals(ctx *config.ParsingContext, path string, includeFromChild *conf
 	return out.locals, out.err
 }
 
-func parseLocalsUncached(ctx *config.ParsingContext, path string, includeFromChild *config.IncludeConfig) (ResolvedLocals, error) {
+func parseLocalsUncached(goCtx context.Context, ctx *config.ParsingContext, path string, includeFromChild *config.IncludeConfig) (ResolvedLocals, error) {
 	file, err := hclparse.NewParser(ctx.ParserOptions...).ParseFromFile(path)
 	if err != nil {
 		return ResolvedLocals{}, err
 	}
 
 	// Decode just the Base blocks. See the function docs for DecodeBaseBlocks for more info on what base blocks are.
-	baseBlocks, err := config.DecodeBaseBlocks(ctx, tgLogger, file, includeFromChild)
+	baseBlocks, err := config.DecodeBaseBlocks(goCtx, ctx, tgLogger, file, includeFromChild)
 	if err != nil {
 		return ResolvedLocals{}, err
 	}
@@ -151,7 +152,7 @@ func parseLocalsUncached(ctx *config.ParsingContext, path string, includeFromChi
 	mergedParentLocals := ResolvedLocals{}
 	if baseBlocks.TrackInclude != nil && includeFromChild == nil {
 		for _, includeConfig := range baseBlocks.TrackInclude.CurrentList {
-			parentLocals, _ := parseLocals(ctx, includeConfig.Path, &includeConfig)
+			parentLocals, _ := parseLocals(goCtx, ctx, includeConfig.Path, &includeConfig)
 			mergedParentLocals = mergeResolvedLocals(mergedParentLocals, parentLocals)
 		}
 	}
