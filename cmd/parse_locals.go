@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"github.com/gruntwork-io/go-commons/errors"
 	"github.com/gruntwork-io/terragrunt/pkg/config"
@@ -157,10 +158,35 @@ func parseLocalsUncached(goCtx context.Context, ctx *config.ParsingContext, path
 		}
 	}
 	childLocals, err := resolveLocals(*baseBlocks.Locals)
+	// A local tac cares about resolved to an unknown value because outputs were skipped.
+	// Treat it as resolvable: re-decode just this file's locals with outputs enabled and
+	// use that. Parents are untouched (they self-heal through their own parseLocals).
+	if goerrors.Is(err, errLocalNeedsOutputs) {
+		fullBlocks, ferr := config.DecodeBaseBlocks(goCtx, fullOutputsContext(ctx), tgLogger, file, includeFromChild)
+		if ferr != nil {
+			return ResolvedLocals{}, ferr
+		}
+		childLocals, err = resolveLocals(*fullBlocks.Locals)
+	}
 	if err != nil {
 		return ResolvedLocals{}, err
 	}
 	return mergeResolvedLocals(mergedParentLocals, childLocals), nil
+}
+
+// errLocalNeedsOutputs signals that a consumed local resolved to an unknown value
+// (because we parse with SkipOutput), so the file must be re-parsed with outputs.
+var errLocalNeedsOutputs = goerrors.New("atlantis local requires resolved outputs")
+
+// fullOutputsContext returns a clone of ctx that resolves dependency outputs: SkipOutput
+// off, terragrunt's stock read_terragrunt_config (our override cleared), and the partial
+// parse cache disabled so a previously-cached skipped-output result is not reused.
+func fullOutputsContext(ctx *config.ParsingContext) *config.ParsingContext {
+	c := ctx.Clone()
+	c.SkipOutput = false
+	c.PredefinedFunctions = nil
+	c.UsePartialParseConfigCache = false
+	return c
 }
 
 func resolveLocals(localsAsCty cty.Value) (ResolvedLocals, error) {
@@ -174,47 +200,74 @@ func resolveLocals(localsAsCty cty.Value) (ResolvedLocals, error) {
 
 	workflowValue, ok := rawLocals["atlantis_workflow"]
 	if ok {
+		if !workflowValue.IsKnown() {
+			return resolved, errLocalNeedsOutputs
+		}
 		resolved.AtlantisWorkflow = workflowValue.AsString()
 	}
 
 	versionValue, ok := rawLocals["atlantis_terraform_version"]
 	if ok {
+		if !versionValue.IsKnown() {
+			return resolved, errLocalNeedsOutputs
+		}
 		resolved.TerraformVersion = versionValue.AsString()
 	}
 
 	autoPlanValue, ok := rawLocals["atlantis_autoplan"]
 	if ok {
+		if !autoPlanValue.IsKnown() {
+			return resolved, errLocalNeedsOutputs
+		}
 		hasValue := autoPlanValue.True()
 		resolved.AutoPlan = &hasValue
 	}
 
 	skipValue, ok := rawLocals["atlantis_skip"]
 	if ok {
+		if !skipValue.IsKnown() {
+			return resolved, errLocalNeedsOutputs
+		}
 		hasValue := skipValue.True()
 		resolved.Skip = &hasValue
 	}
 
 	applyReqs, ok := rawLocals["atlantis_apply_requirements"]
 	if ok {
+		if !applyReqs.IsKnown() {
+			return resolved, errLocalNeedsOutputs
+		}
 		resolved.ApplyRequirements = []string{}
 		it := applyReqs.ElementIterator()
 		for it.Next() {
 			_, val := it.Element()
+			if !val.IsKnown() {
+				return resolved, errLocalNeedsOutputs
+			}
 			resolved.ApplyRequirements = append(resolved.ApplyRequirements, val.AsString())
 		}
 	}
 
 	markedProject, ok := rawLocals["atlantis_project"]
 	if ok {
+		if !markedProject.IsKnown() {
+			return resolved, errLocalNeedsOutputs
+		}
 		hasValue := markedProject.True()
 		resolved.markedProject = &hasValue
 	}
 
 	extraDependenciesAsCty, ok := rawLocals["extra_atlantis_dependencies"]
 	if ok {
+		if !extraDependenciesAsCty.IsKnown() {
+			return resolved, errLocalNeedsOutputs
+		}
 		it := extraDependenciesAsCty.ElementIterator()
 		for it.Next() {
 			pos, val := it.Element()
+			if !val.IsKnown() {
+				return resolved, errLocalNeedsOutputs
+			}
 			if !val.Type().Equals(cty.String) {
 				posInt, _ := pos.AsBigFloat().Int64()
 				return resolved, fmt.Errorf("extra_atlantis_dependencies contains non-string value at position %d", posInt)

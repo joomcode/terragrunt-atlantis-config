@@ -66,6 +66,18 @@ func newParsingContext(goCtx context.Context, configPath string, env map[string]
 	// the generated output is unchanged.
 	pctx.UsePartialParseConfigCache = true
 
+	// Skip `tofu/terraform output` resolution while parsing (same as `terragrunt hcl
+	// validate` and discovery). We only need dependency paths / terraform source, not
+	// output values, so this avoids remote-state shell-outs and stops output-resolution
+	// failures from blocking config generation.
+	pctx.SkipOutput = true
+
+	// Override read_terragrunt_config so nested reads honour SkipOutput and expose
+	// unresolved dependency outputs as cty.DynamicVal instead of null (which would
+	// cascade into "attribute from null value" on dependency.X.outputs references).
+	// PredefinedFunctions is copied last into the eval-context func map, so it wins.
+	pctx.PredefinedFunctions = predefinedParseFunctions(goCtx, pctx, tgLogger)
+
 	return pctx, nil
 }
 
