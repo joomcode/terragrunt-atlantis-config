@@ -1,0 +1,37 @@
+automerge: false
+parallel_apply: true
+parallel_plan: true
+projects:
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - stack.hcl
+    - ../shared.hcl
+  dir: child
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - stack.hcl
+    - ../shared.hcl
+  dir: child2
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - stack.hcl
+    - ../indirect.hcl
+    - ../shared.hcl
+  dir: child3
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../included/cfg.hcl
+  dir: child4
+version: 3

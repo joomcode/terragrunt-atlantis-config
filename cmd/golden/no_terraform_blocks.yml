@@ -8,8 +8,12 @@ projects:
     - '*.hcl'
     - '*.tf*'
     - ../../../../terragrunt.hcl
+    - ../../../account.hcl
+    - ../env.hcl
+    - ../../region.hcl
     - ../network/terragrunt.hcl
     - ../../stage/network/terragrunt.hcl
+    - ../../stage/env.hcl
   dir: myproject/eu-south-1/infra/apps
 - autoplan:
     enabled: true
@@ -17,7 +21,11 @@ projects:
     - '*.hcl'
     - '*.tf*'
     - ../../../../terragrunt.hcl
+    - ../../../account.hcl
+    - ../env.hcl
+    - ../../region.hcl
     - ../../stage/network/terragrunt.hcl
+    - ../../stage/env.hcl
   dir: myproject/eu-south-1/infra/network
 - autoplan:
     enabled: true
@@ -25,6 +33,9 @@ projects:
     - '*.hcl'
     - '*.tf*'
     - ../../../../terragrunt.hcl
+    - ../../../account.hcl
+    - ../../region.hcl
+    - ../env.hcl
     - ../network/terragrunt.hcl
   dir: myproject/eu-south-1/stage/dbs
 - autoplan:
@@ -33,6 +44,9 @@ projects:
     - '*.hcl'
     - '*.tf*'
     - ../../../../terragrunt.hcl
+    - ../../../account.hcl
+    - ../../region.hcl
+    - ../env.hcl
   dir: myproject/eu-south-1/stage/network
 - autoplan:
     enabled: true
@@ -40,6 +54,9 @@ projects:
     - '*.hcl'
     - '*.tf*'
     - ../../../terragrunt.hcl
+    - ../../account.hcl
+    - ../env.hcl
+    - ../region.hcl
   dir: myproject/global/dns
 - autoplan:
     enabled: true
@@ -47,5 +64,8 @@ projects:
     - '*.hcl'
     - '*.tf*'
     - ../../../terragrunt.hcl
+    - ../../account.hcl
+    - ../env.hcl
+    - ../region.hcl
   dir: myproject/global/iam
 version: 3

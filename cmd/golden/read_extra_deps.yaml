@@ -1,0 +1,40 @@
+automerge: false
+parallel_apply: true
+parallel_plan: true
+projects:
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../assets/*.conf
+    - ../assets/abs.json
+    - ../assets/x.json
+    - ../shared.hcl
+  dir: direct
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../deep.hcl
+    - ../deep/z.json
+    - ../mid.hcl
+  dir: nested
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../origdir.hcl
+    - local.json
+  dir: per_unit_a
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../origdir.hcl
+    - local.json
+  dir: per_unit_b
+version: 3

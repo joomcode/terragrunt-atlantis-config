@@ -96,6 +96,15 @@ func mergeResolvedLocals(parent ResolvedLocals, child ResolvedLocals) ResolvedLo
 		parent.ApplyRequirements = child.ApplyRequirements
 	}
 
+	// Entries are appended verbatim, so a relative one declared in the parent ends up
+	// resolved against the *child* (getDependencies -> makePathAbsolute). Do not
+	// "fix" that into symmetry with the read_terragrunt_config path: a parent names
+	// child-local files through path_relative_to_include(), e.g. the conditional
+	// local_tags.yaml in test_examples/parent_with_extra_deps/parent/terragrunt.hcl,
+	// and resolving it against the parent would point at a file that does not exist.
+	// A read target has no include tracking (path_relative_to_include() is "." there),
+	// so its own dir is the only base it can name — see declaredExtraDeps in
+	// cmd/read_terragrunt_config.go.
 	parent.ExtraAtlantisDependencies = append(parent.ExtraAtlantisDependencies, child.ExtraAtlantisDependencies...)
 
 	return parent
@@ -257,28 +266,49 @@ func resolveLocals(localsAsCty cty.Value) (ResolvedLocals, error) {
 		resolved.markedProject = &hasValue
 	}
 
-	extraDependenciesAsCty, ok := rawLocals["extra_atlantis_dependencies"]
-	if ok {
-		if !extraDependenciesAsCty.IsKnown() {
-			return resolved, errLocalNeedsOutputs
-		}
-		it := extraDependenciesAsCty.ElementIterator()
-		for it.Next() {
-			pos, val := it.Element()
-			if !val.IsKnown() {
-				return resolved, errLocalNeedsOutputs
-			}
-			if !val.Type().Equals(cty.String) {
-				posInt, _ := pos.AsBigFloat().Int64()
-				return resolved, fmt.Errorf("extra_atlantis_dependencies contains non-string value at position %d", posInt)
-			}
-
-			resolved.ExtraAtlantisDependencies = append(
-				resolved.ExtraAtlantisDependencies,
-				filepath.ToSlash(val.AsString()),
-			)
-		}
+	extraDependencies, err := extraDepsFromLocals(localsAsCty)
+	if err != nil {
+		return resolved, err
 	}
+	resolved.ExtraAtlantisDependencies = extraDependencies
 
 	return resolved, nil
+}
+
+// extraDepsFromLocals pulls extra_atlantis_dependencies out of an already decoded
+// `locals` map, returning the entries verbatim (globs included). Shared with the
+// read_terragrunt_config override, which propagates a read target's declared
+// dependencies to its consumers.
+func extraDepsFromLocals(localsAsCty cty.Value) ([]string, error) {
+	if localsAsCty == cty.NilVal || localsAsCty.IsNull() || !localsAsCty.IsKnown() {
+		return nil, nil
+	}
+	if !localsAsCty.Type().IsObjectType() && !localsAsCty.Type().IsMapType() {
+		return nil, nil
+	}
+
+	extraDependenciesAsCty, ok := localsAsCty.AsValueMap()["extra_atlantis_dependencies"]
+	if !ok || extraDependenciesAsCty.IsNull() {
+		return nil, nil
+	}
+	if !extraDependenciesAsCty.IsKnown() {
+		return nil, errLocalNeedsOutputs
+	}
+
+	var deps []string
+	it := extraDependenciesAsCty.ElementIterator()
+	for it.Next() {
+		pos, val := it.Element()
+		if !val.IsKnown() {
+			return nil, errLocalNeedsOutputs
+		}
+		if !val.Type().Equals(cty.String) {
+			posInt, _ := pos.AsBigFloat().Int64()
+			return nil, fmt.Errorf("extra_atlantis_dependencies contains non-string value at position %d", posInt)
+		}
+
+		deps = append(deps, filepath.ToSlash(val.AsString()))
+	}
+
+	return deps, nil
 }

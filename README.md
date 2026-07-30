@@ -124,6 +124,49 @@ If you specify `extra_atlantis_dependencies` in the parent Terragrunt module, th
 2. Absolute paths will work as they would in a child module, and the path in the output will be relative from the child module to the absolute path
 3. Relative paths, like the string `"foo.json"`, will be evaluated as relative to the Child module. This means that if you need something relative to the parent module, you should use something like `"${get_parent_terragrunt_dir()}/foo.json"`
 
+### Automatic tracking of read files
+
+Many `extra_atlantis_dependencies` entries just re-declare a file the module already reads while parsing.
+This tool folds every file Terragrunt records reading during a parse straight into `when_modified`, so
+those entries can be dropped. This is always on and covers what Terragrunt itself records:
+`read_terragrunt_config`, `read_tfvars_file`, `sops_decrypt_file`, `include` blocks, and explicit
+[`mark_as_read`](https://terragrunt.gruntwork.io/docs/reference/built-in-functions/#mark_as_read) /
+`mark_glob_as_read` calls.
+
+`file(...)`, `templatefile(...)` and `find_in_parent_folders(...)` are **not** tracked. Terragrunt does not
+record them, and this tool cannot add that: it can only override HCL functions through
+`ParsingContext.PredefinedFunctions`, and such an override cannot tell which config file is being evaluated —
+which is exactly what `file()` resolves relative paths against. See `cmd/read_terragrunt_config.go` for the
+details. A `find_in_parent_folders(...)` result still reaches `when_modified` whenever an `include` or
+`read_terragrunt_config` consumes it; a plain `file()` target does not.
+
+So for a file consumed via `file()`/`templatefile()`, a path computed at runtime, or a file consumed entirely
+out of band (a Dockerfile, a Packer template), use `mark_as_read` / `mark_glob_as_read` — tracked, and
+Terragrunt resolves the path itself — or keep an `extra_atlantis_dependencies` entry.
+
+### Propagation of `extra_atlantis_dependencies` through `read_terragrunt_config`
+
+`extra_atlantis_dependencies` declared in a config pulled in with `read_terragrunt_config(...)` reaches the
+consuming project, at any nesting depth, with no forwarding boilerplate. This matters for the paths tracking
+cannot see — a file a terraform module consumes at apply, a glob, a path built at runtime — since those are
+exactly the entries that stay declared by hand. It is always on.
+
+Relative entries resolve against **the directory of the config that declares them**, and globs are passed
+through verbatim (never expanded), so a newly added file matching one needs no regenerated config:
+
+```hcl
+# shared/app_config.hcl, read by several units via read_terragrunt_config
+locals {
+  extra_atlantis_dependencies = ["templates/*.json"] # -> <this dir>/templates/*.json for every consumer
+}
+```
+
+Note the asymmetry with an `include` parent, whose relative entries resolve against the **child** (see the
+merge rules above). That is deliberate: an include parent can talk about the child through
+`path_relative_to_include()`, whereas a `read_terragrunt_config` target has no include tracking at all, so
+its own directory is the only base it can name. Terragrunt's `mark_as_read` anchors relative paths the same
+way when called from a read target.
+
 ## All Flags
 
 One way to customize the behavior of this module is through CLI flag values passed in at runtime. These settings will apply to all modules.

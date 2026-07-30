@@ -9,9 +9,9 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/gruntwork-io/terragrunt/pkg/config"
-	"github.com/gruntwork-io/terragrunt/pkg/options"
 	tglog "github.com/gruntwork-io/terragrunt/pkg/log"
 	"github.com/gruntwork-io/terragrunt/pkg/log/format"
+	"github.com/gruntwork-io/terragrunt/pkg/options"
 	"github.com/spf13/cobra"
 
 	"golang.org/x/sync/errgroup"
@@ -58,13 +58,16 @@ func newParsingContext(goCtx context.Context, configPath string, env map[string]
 	pctx.TofuImplementation = opts.TofuImplementation
 	pctx.Writers = opts.Writers
 
-	// Reuse terragrunt's partial-parse result cache (seeded on the shared context
-	// via config.WithConfigValues). Without this flag every PartialParseConfigFile
-	// re-parses from scratch, so the dependency-block cycle-detection DFS re-walks
-	// the same shared dependency configs (e.g. subnets, *-shared) once per project.
-	// The cache is keyed by config path + file content + include + decode list, so
-	// the generated output is unchanged.
-	pctx.UsePartialParseConfigCache = true
+	// Terragrunt's decoded-config cache MUST stay off. It looks like an easy speedup,
+	// but on a cache hit terragrunt returns an already-decoded config without re-running
+	// HCL evaluation, so the read side effects that populate ParsingContext.FilesRead are
+	// skipped — the tracked read set would then depend on which project parsed a shared
+	// config first (verified: two parallel cache-on runs differed). Determinism needs
+	// every parse to re-evaluate. The cost of re-evaluation is bounded by the per-target
+	// read memo in the read_terragrunt_config override (lookupOrParseReadTarget), which
+	// parses each shared read target once and replays its transitive read set to later
+	// consumers — recovering most of the cost while staying deterministic.
+	pctx.UsePartialParseConfigCache = false
 
 	// Skip `tofu/terraform output` resolution while parsing (same as `terragrunt hcl
 	// validate` and discovery). We only need dependency paths / terraform source, not
@@ -228,6 +231,14 @@ func getDependencies(goCtx context.Context, ctx *config.ParsingContext, path str
 		// Get deps from locals
 		if locals.ExtraAtlantisDependencies != nil {
 			dependencies = sliceUnion(dependencies, locals.ExtraAtlantisDependencies)
+		}
+
+		// Fold in every file terragrunt recorded reading while parsing this module:
+		// includes, read_terragrunt_config, read_tfvars_file, sops_decrypt_file and
+		// mark_as_read. file()/templatefile() are not recorded — see
+		// predefinedParseFunctions for why this tool cannot record them either.
+		if ctx.FilesRead != nil {
+			dependencies = sliceUnion(dependencies, ctx.FilesRead.Paths())
 		}
 
 		// Get deps from `dependencies` and `dependency` blocks

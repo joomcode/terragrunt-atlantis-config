@@ -29,7 +29,9 @@ projects:
     - '**/*.tf*'
     - ../../../terragrunt.hcl
     - ../env-a/network/vpc/terragrunt.hcl
+    - ../env-a/env.hcl
     - ../../../network-account/eu-west-1/network/transit-gateway/terragrunt.hcl
+    - ../../../network-account/eu-west-1/network/env.hcl
   dir: multi_accounts_vpc_route53_tgw/prod/eu-west-1/_global
 - autoplan:
     enabled: false
@@ -40,6 +42,7 @@ projects:
     - '**/*.tf*'
     - ../../../terragrunt.hcl
     - ../../../network-account/eu-west-1/network/transit-gateway/terragrunt.hcl
+    - ../../../network-account/eu-west-1/network/env.hcl
   dir: multi_accounts_vpc_route53_tgw/prod/eu-west-1/env-a
 - autoplan:
     enabled: false
@@ -49,7 +52,10 @@ projects:
     - '**/*.hcl'
     - '**/*.tf*'
     - ../../../terragrunt.hcl
+    - ../../account.hcl
+    - ../region.hcl
     - ../stage/network/terragrunt.hcl
+    - ../stage/env.hcl
   dir: no_terraform_blocks/myproject/eu-south-1/infra
 - autoplan:
     enabled: false
@@ -59,6 +65,8 @@ projects:
     - '**/*.hcl'
     - '**/*.tf*'
     - ../../../terragrunt.hcl
+    - ../../account.hcl
+    - ../region.hcl
   dir: no_terraform_blocks/myproject/eu-south-1/stage
 - autoplan:
     enabled: false
@@ -68,6 +76,7 @@ projects:
     - '**/*.hcl'
     - '**/*.tf*'
     - ../../terragrunt.hcl
+    - ../account.hcl
   dir: no_terraform_blocks/myproject/global
 - autoplan:
     enabled: false

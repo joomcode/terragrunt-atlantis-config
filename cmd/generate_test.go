@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -23,6 +24,7 @@ func resetForRun() error {
 	// reset caches
 	getDependenciesCache = newGetDependenciesCache()
 	requestGroup = singleflight.Group{}
+	readMemo = sync.Map{}
 	// reset flags
 	gitRoot = pwd
 	autoPlan = false
@@ -168,6 +170,47 @@ func TestExtraDeclaredDependencies(t *testing.T) {
 	})
 }
 
+func TestFilesRead(t *testing.T) {
+	runTest(t, filepath.Join("golden", "files_read.yaml"), []string{
+		"--root",
+		filepath.Join("..", "test_examples", "files_read"),
+	})
+}
+
+// extra_atlantis_dependencies declared in a config pulled in via read_terragrunt_config
+// must reach the consuming unit: relative entries resolved against the declaring file
+// (direct), globs left unexpanded (direct), through a nested read (nested), and keyed per
+// consuming unit when the declaration uses get_original_terragrunt_dir (per_unit_a/b).
+func TestReadTargetExtraDependencies(t *testing.T) {
+	runTest(t, filepath.Join("golden", "read_extra_deps.yaml"), []string{
+		"--root",
+		filepath.Join("..", "test_examples", "read_extra_deps"),
+	})
+}
+
+func TestNonStringErrorOnReadTargetExtraDependencies(t *testing.T) {
+	err := resetForRun()
+	if err != nil {
+		t.Error("Failed to reset default flags")
+		return
+	}
+
+	rootCmd.SetArgs([]string{
+		"generate",
+		"--root",
+		filepath.Join("..", "test_examples_errors", "read_extra_dependency_error"),
+	})
+	err = rootCmd.Execute()
+
+	// The message names the declaring config, so match on the reason rather than the
+	// whole error (which carries absolute paths and the caller's source range).
+	expectedError := "extra_atlantis_dependencies contains non-string value at position 1"
+	if err == nil || !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error containing '%s', got '%v'", expectedError, err)
+		return
+	}
+}
+
 func TestNonStringErrorOnExtraDeclaredDependencies(t *testing.T) {
 	err := resetForRun()
 	if err != nil {
@@ -181,7 +224,7 @@ func TestNonStringErrorOnExtraDeclaredDependencies(t *testing.T) {
 		filepath.Join("..", "test_examples_errors", "extra_dependency_error"),
 	})
 	err = rootCmd.Execute()
-	
+
 	expectedError := "extra_atlantis_dependencies contains non-string value at position 4"
 	if err == nil || err.Error() != expectedError {
 		t.Errorf("Expected error '%s', got '%v'", expectedError, err)
