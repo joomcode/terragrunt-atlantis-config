@@ -38,12 +38,14 @@ var tgLogger = tglog.New(
 // ParsingContext (TerragruntOptions is no longer threaded through it). We still
 // build a TerragruntOptions to reuse terragrunt's own defaults (working/download
 // dirs, strict controls, experiments, ...) and copy the relevant fields over.
+// In terragrunt >=1.1 the shell environment and the output writers live on
+// ParsingContext.Venv instead of TerragruntOptions: NewParsingContext seeds it
+// from the OS, so only the environment needs overriding here.
 func newParsingContext(goCtx context.Context, configPath string, env map[string]string) (*config.ParsingContext, error) {
 	opts, err := options.NewTerragruntOptionsWithConfigPath(configPath)
 	if err != nil {
 		return nil, err
 	}
-	opts.Env = env
 
 	_, pctx := config.NewParsingContext(goCtx, tgLogger, config.WithStrictControls(opts.StrictControls))
 	pctx.TerragruntConfigPath = opts.TerragruntConfigPath
@@ -51,12 +53,11 @@ func newParsingContext(goCtx context.Context, configPath string, env map[string]
 	pctx.WorkingDir = opts.WorkingDir
 	pctx.RootWorkingDir = opts.RootWorkingDir
 	pctx.DownloadDir = opts.DownloadDir
-	pctx.Env = opts.Env
+	pctx.Venv = pctx.Venv.WithEnv(env)
 	pctx.MaxFoldersToCheck = opts.MaxFoldersToCheck
 	pctx.Experiments = opts.Experiments
 	pctx.TFPath = opts.TFPath
 	pctx.TofuImplementation = opts.TofuImplementation
-	pctx.Writers = opts.Writers
 
 	// Terragrunt's decoded-config cache MUST stay off. It looks like an easy speedup,
 	// but on a cache hit terragrunt returns an already-decoded config without re-running
@@ -325,7 +326,7 @@ func getDependencies(goCtx context.Context, ctx *config.ParsingContext, path str
 			}
 
 			depPath := dep
-			terrContext, err := newParsingContext(goCtx, depPath, ctx.Env)
+			terrContext, err := newParsingContext(goCtx, depPath, ctx.Venv.Env)
 			if err != nil {
 				continue
 			}
@@ -719,7 +720,7 @@ func FindConfigFilesInPath(rootPath string, opts *options.TerragruntOptions) ([]
 		return nil
 	})
 
-	nestedConfigFiles, err := config.FindConfigFilesInPath(rootPath, opts.Experiments, opts.TerragruntConfigPath, opts.Env, opts.DownloadDir)
+	nestedConfigFiles, err := config.FindConfigFilesInPath(rootPath, opts.Experiments, opts.TerragruntConfigPath, getEnvs(), opts.DownloadDir)
 	if err == nil {
 		configFiles = append(configFiles, nestedConfigFiles...)
 	}

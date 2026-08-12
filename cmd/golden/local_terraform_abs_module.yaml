@@ -8,6 +8,7 @@ projects:
     - '*.hcl'
     - '*.tf*'
     - ../terragrunt.hcl
+    - ../root-module/main.tf
     - ../root-module/*.tf*
     - ../terraform-module/*.tf*
   dir: terragrunt-module

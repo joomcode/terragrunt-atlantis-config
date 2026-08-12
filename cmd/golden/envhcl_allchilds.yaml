@@ -254,6 +254,7 @@ projects:
     - '*.hcl'
     - '*.tf*'
     - ../terragrunt.hcl
+    - ../root-module/main.tf
     - ../root-module/*.tf*
     - ../terraform-module/*.tf*
   dir: local_terraform_abs_module_source/terragrunt-module
@@ -262,6 +263,7 @@ projects:
     when_modified:
     - '*.hcl'
     - '*.tf*'
+    - ../root-module/main.tf
     - ../root-module/*.tf*
     - ../terraform-module/*.tf*
   dir: local_terraform_module_source/terragrunt-module
