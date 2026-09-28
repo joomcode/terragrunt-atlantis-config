@@ -8,7 +8,7 @@ require (
 	github.com/gruntwork-io/terragrunt v1.1.2
 	github.com/hashicorp/go-getter v1.8.6
 	github.com/hashicorp/hcl/v2 v2.24.0
-	github.com/hashicorp/terraform-config-inspect v0.0.0-20241129133400-c404f8227ea6
+	github.com/hashicorp/terraform-config-inspect v0.0.0-20260904064934-75d64de68c31
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.11.1
