@@ -249,6 +249,8 @@ func getDependencies(goCtx context.Context, ctx *config.ParsingContext, path str
 			}
 		}
 
+		generatedLocals := generatedLocalsFor(goCtx, ctx, path)
+
 		// Get deps from the `Source` field of the `Terraform` block
 		if parsedConfig.Terraform != nil && parsedConfig.Terraform.Source != nil {
 			source := parsedConfig.Terraform.Source
@@ -272,7 +274,7 @@ func getDependencies(goCtx context.Context, ctx *config.ParsingContext, path str
 
 				dependencies = append(dependencies, filepath.Join(parsedSource, "*.tf*"))
 
-				ls, err := parseTerraformLocalModuleSource(parsedSource)
+				ls, err := parseTerraformLocalModuleSource(parsedSource, generatedLocals)
 				if err != nil {
 					return nil, err
 				}
@@ -367,7 +369,7 @@ func getDependencies(goCtx context.Context, ctx *config.ParsingContext, path str
 		if filepath.Base(path) == "terragrunt.hcl" {
 			dir := filepath.Dir(path)
 
-			ls, err := parseTerraformLocalModuleSource(dir)
+			ls, err := parseTerraformLocalModuleSource(dir, generatedLocals)
 			if err != nil {
 				return nil, err
 			}

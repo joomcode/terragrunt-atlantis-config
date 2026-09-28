@@ -9,5 +9,18 @@ projects:
     - '*.tf*'
     - ../terragrunt.hcl
     - ../modules/local-module/*.tf*
+    - ../modules/nested-module/*.tf*
+    - ../modules/root-module/*.tf*
   dir: unit
+- autoplan:
+    enabled: false
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../terragrunt.hcl
+    - ../modules/wrapper/main.tf
+    - ../modules/wrapper/*.tf*
+    - ../modules/nested-module/*.tf*
+    - ../modules/root-module/*.tf*
+  dir: wrapped
 version: 3
